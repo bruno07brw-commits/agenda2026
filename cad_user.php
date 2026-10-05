@@ -37,6 +37,119 @@
             <label class="custom-file-label" for="exampleInputFile">Arquivo de imagem</label>
             </div>
             
+            <?php
+
+require_once __DIR__ . '/config/conexao.php';
+
+if (isset($_POST['botao'])) {
+
+    $nome = trim($_POST['nome'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $senha = $_POST['senha'] ?? '';
+
+    if (empty($nome) || empty($email) || empty($senha)) {
+        echo "Preencha todos os campos.";
+        exit;
+    }
+
+    // Criptografa a senha
+    $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
+
+    // Foto padrão
+    $foto = 'avatar_padrao.png';
+
+    // Pasta das fotos
+    $pasta = __DIR__ . '/img/';
+
+    // Cria a pasta se não existir
+    if (!is_dir($pasta)) {
+        mkdir($pasta, 0755, true);
+    }
+
+    // Verifica se enviou foto
+    if (isset($_FILES['foto']) && $_FILES['foto']['error'] == UPLOAD_ERR_OK) {
+
+        $imagem = getimagesize($_FILES['foto']['tmp_name']);
+
+        if ($imagem === false) {
+            echo "O arquivo não é uma imagem válida.";
+            exit;
+        }
+
+        $tipos = array(
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/gif'  => 'gif'
+        );
+
+        if (!isset($tipos[$imagem['mime']])) {
+            echo "Formato de imagem inválido.";
+            exit;
+        }
+
+        $extensao = $tipos[$imagem['mime']];
+
+        $novoNome = uniqid() . '.' . $extensao;
+
+        if (move_uploaded_file(
+            $_FILES['foto']['tmp_name'],
+            $pasta . $novoNome
+        )) {
+            $foto = $novoNome;
+        } else {
+            echo "Não foi possível salvar a foto.";
+            exit;
+        }
+    }
+
+    // Verifica se o e-mail já existe
+    $consulta = $conect->prepare(
+        "SELECT id_user FROM tb_user WHERE email_user = :email"
+    );
+
+    $consulta->bindValue(':email', $email, PDO::PARAM_STR);
+    $consulta->execute();
+
+    if ($consulta->rowCount() > 0) {
+        echo "Este e-mail já está cadastrado.";
+        exit;
+    }
+
+    // Cadastra o usuário
+    $sql = "INSERT INTO tb_user
+            (foto_user, nome_user, email_user, senha_user)
+            VALUES
+            (:foto, :nome, :email, :senha)";
+
+    try {
+
+        $result = $conect->prepare($sql);
+
+        $result->bindValue(':foto', $foto, PDO::PARAM_STR);
+        $result->bindValue(':nome', $nome, PDO::PARAM_STR);
+        $result->bindValue(':email', $email, PDO::PARAM_STR);
+        $result->bindValue(':senha', $senha_hash, PDO::PARAM_STR);
+
+        $result->execute();
+
+        echo "Cadastro realizado com sucesso!";
+
+        echo '<script>
+                setTimeout(function() {
+                    window.location.href = "index.php";
+                }, 3000);
+              </script>';
+
+    } catch (PDOException $e) {
+
+        echo "Erro ao cadastrar usuário.";
+        echo "<br>";
+        echo $e->getMessage();
+    }
+}
+?>
+            
+
         </div>
         </div>
         <div class="input-group mb-3">
